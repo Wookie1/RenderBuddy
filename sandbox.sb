@@ -1,0 +1,37 @@
+;; RenderBuddy's sandbox for Blender (macOS Seatbelt). Render jobs are Python scripts sent from STEVE, so Blender
+;; runs inside these limits: no internet, writes only where rendering needs them, and secrets out of reach.
+;; renderbuddy.py passes JOB (this job's folder), JOBS (all job folders), RBHOME (~/.renderbuddy) and USERHOME.
+;; Later rules win over earlier ones. Turn it off with "sandbox": false in ~/.renderbuddy/config.json.
+(version 1)
+(allow default)
+
+;; No network: a job can't send anything anywhere or download anything.
+(deny network-outbound (remote ip "*:*"))
+(deny network-bind (local ip "*:*"))
+
+;; Writes: only this job's folder, temporary folders, devices, and Blender's caches.
+(deny file-write*)
+(allow file-write*
+  (subpath (param "JOB"))
+  (subpath "/private/tmp")
+  (subpath "/private/var/folders")
+  (subpath "/dev")
+  (subpath (string-append (param "USERHOME") "/Library/Caches"))
+  (subpath (string-append (param "USERHOME") "/Library/Application Support/Blender")))
+
+;; Reads: keep keys, passwords and the connector's own settings out of reach.
+(deny file-read*
+  (subpath (param "RBHOME"))
+  (subpath (string-append (param "USERHOME") "/.ssh"))
+  (subpath (string-append (param "USERHOME") "/.gnupg"))
+  (subpath (string-append (param "USERHOME") "/.aws"))
+  (subpath (string-append (param "USERHOME") "/.config"))
+  (literal (string-append (param "USERHOME") "/.netrc"))
+  (subpath (string-append (param "USERHOME") "/Library/Keychains"))
+  (subpath (string-append (param "USERHOME") "/Library/Cookies"))
+  (subpath (string-append (param "USERHOME") "/Library/Mail"))
+  (subpath (string-append (param "USERHOME") "/Library/Messages"))
+  (subpath (string-append (param "USERHOME") "/Library/Safari"))
+  (subpath (string-append (param "USERHOME") "/Library/Application Support/Google"))
+  (subpath (string-append (param "USERHOME") "/Library/Application Support/Firefox")))
+(allow file-read* (subpath (param "JOBS")))

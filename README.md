@@ -40,8 +40,8 @@ Open **RenderBuddy** from Applications. The first time, it asks for a pairing co
 
 1. In STEVE, open **Settings → Connectors** and click **Pair**. Copy the code.
 2. Paste it into RenderBuddy and click **Pair**.
-3. RenderBuddy copies a fingerprint to your clipboard. Paste it into STEVE to confirm it's your Mac, then allow
-   RenderBuddy's actions.
+3. RenderBuddy copies a fingerprint to your clipboard. Paste it into STEVE to confirm it's your Mac.
+4. Allow RenderBuddy's actions. We recommend letting **agents'** jobs wait for your OK (see [Security](#security)).
 
 RenderBuddy also adds a **RenderBuddy** tab to STEVE's right pane, which shows whether it's on and what it's
 rendering.
@@ -75,6 +75,7 @@ Then remove the connector in STEVE under **Settings → Connectors**. Nothing el
 | `steve_connect.py` | Signed requests to STEVE's connector API |
 | `blender_runner.py`, `threemf.py`, `steve_motion.py`, `steve_explode.py` | Inside Blender: loads designs, joints, animations and exploded views |
 | `bbkit.py`, `bbstate.py` | The marketing-kit studio, layouts and outputs |
+| `sandbox.sb` | The sandbox Blender runs in |
 | `panel/` | The RenderBuddy tab shown in STEVE |
 | `app/` | The Mac app (`RenderBuddy.swift`), its icon, and a simpler fallback (`RenderBuddy.applescript`) |
 | `examples/` | Example scene scripts |
@@ -138,6 +139,30 @@ Scripts sent to render_scene can use the same pieces: `import bbkit`, then `bbki
 
     .venv/bin/python renderbuddy.py test my_scene.py stand=stand.3mf --mode=still
     .venv/bin/python renderbuddy.py test my_scene.py stand=stand.3mf+stand_kinematics.json   # with motion
+
+## Security
+
+A render job is a Blender Python script, and Blender scripts are programs. Anyone who can send RenderBuddy a job
+can run code on your Mac, so RenderBuddy keeps that circle small and the code boxed in:
+
+- **Only STEVE can send jobs.** RenderBuddy connects out to STEVE and opens no port on your Mac. Every job is signed
+  by STEVE and checked (Ed25519) before it runs, and a job can't be replayed.
+- **You decide who in STEVE may send jobs.** In STEVE's connector settings, each action lists who may run it (you,
+  your assistant, your agents) and whose runs wait for your OK. We recommend letting **agents'** jobs wait for you,
+  so a confused or tricked agent can't run a script unseen.
+- **Blender runs in a sandbox** (`sandbox.sb`, macOS's built-in sandboxing): no internet, writes only to that job's
+  folder, temporary folders and Blender's caches, and no reading of SSH keys, keychains, browser data or
+  RenderBuddy's own key and settings. Each result says `"sandboxed": true`. If a scene needs something the sandbox
+  blocks, `"sandbox": false` in `~/.renderbuddy/config.json` turns it off (not recommended).
+- **It's off most of the time.** It only runs when you turn it on, and turns itself off after 30 idle minutes.
+- **Your key stays on your Mac** in `~/.renderbuddy/key.pem` (readable only by you). Nothing secret is in this repo.
+
+What the sandbox doesn't stop: a script can still read ordinary files your account can read (outside the blocked
+places above), and it can put what it read into the pictures or files it sends back to your STEVE account. It can
+also use your Mac's CPU and GPU for as long as the job runs (up to 6 hours). Keep "ask first" on for anything you
+don't fully trust.
+
+Found a security problem? Please open an issue without the details and ask for a private contact.
 
 ## Running it without the app
 

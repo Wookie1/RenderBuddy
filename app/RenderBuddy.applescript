@@ -48,7 +48,7 @@ on pairBB()
 	end try
 	set fp to do shell script "echo " & quoted form of out & " | grep -o 'SHA256:[A-Za-z0-9+/=_-]*' | head -1"
 	set the clipboard to fp
-	display dialog "Paired. One last step, in STEVE:" & return & return & "Paste this fingerprint to confirm it (already copied for you):" & return & fp & return & return & "Then allow RenderBuddy's actions when STEVE asks." buttons {"OK"} default button "OK" with title "RenderBuddy"
+	display dialog "Paired. One last step, in STEVE:" & return & return & "Paste this fingerprint to confirm it (already copied for you):" & return & fp & return & return & "Then allow RenderBuddy's actions. For safety, let agents' jobs wait for your OK." buttons {"OK"} default button "OK" with title "RenderBuddy"
 	return true
 end pairBB
 

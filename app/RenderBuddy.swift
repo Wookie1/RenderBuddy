@@ -383,6 +383,7 @@ struct PairView: View {
                 step(1, "In STEVE, open **Settings → Connectors** and click **Pair**.")
                 step(2, "Copy the pairing code and paste it below.")
                 step(3, "STEVE asks you to confirm a fingerprint. RenderBuddy copies it for you.")
+                step(4, "Allow RenderBuddy's actions. For safety, let **agents'** jobs wait for your OK.")
             }
             TextField("Pairing code", text: $model.pairCode)
                 .textFieldStyle(.roundedBorder)

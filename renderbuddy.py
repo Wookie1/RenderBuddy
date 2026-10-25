@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 
 from steve_connect import SteveClient, SteveError, fingerprint, load_or_create_key, trusted_keys, verify_message
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOME = os.environ.get("RENDERBUDDY_HOME", os.path.expanduser("~/.renderbuddy"))
 CONFIG = os.path.join(HOME, "config.json")
@@ -37,6 +37,7 @@ KEY = os.path.join(HOME, "key.pem")
 JOBS = os.path.join(HOME, "jobs")
 PIDFILE = os.path.join(HOME, "connector.pid")
 STATUS = os.path.join(HOME, "status.json")  # the latest status, for the RenderBuddy app on this computer
+SANDBOX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sandbox.sb")
 PANEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "panel")
 IDLE_QUIT_MINUTES = 30
 MAX_LINKS = 4
@@ -181,8 +182,19 @@ def catalog():
 
 # Running Blender -------------------------------------------------------------------------------------------------------
 
+def sandboxed(cmd, job_dir, enabled=True):
+    """Wraps a Blender command in sandbox.sb (macOS): no network, writes only to the job folder, no secrets.
+    Returns the command and whether it is sandboxed."""
+    tool = shutil.which("sandbox-exec") or "/usr/bin/sandbox-exec"
+    if not enabled or sys.platform != "darwin" or not os.path.exists(tool) or not os.path.exists(SANDBOX):
+        return cmd, False
+    real = os.path.realpath
+    return [tool, "-f", SANDBOX, "-D", f"JOB={real(job_dir)}", "-D", f"JOBS={real(JOBS)}",
+            "-D", f"RBHOME={real(HOME)}", "-D", f"USERHOME={real(os.path.expanduser('~'))}"] + cmd, True
+
+
 def run_blender(blender, job_dir, script_text, links, mode, device, on_progress=None, procs=None, run_id=None,
-                timeout=6 * 3600, kinematics=None):
+                timeout=6 * 3600, kinematics=None, sandbox=True):
     """Render one job in a fresh Blender; returns (report dict, output folder)."""
     out = os.path.join(job_dir, "out")
     os.makedirs(out, exist_ok=True)
@@ -192,8 +204,8 @@ def run_blender(blender, job_dir, script_text, links, mode, device, on_progress=
     job = os.path.join(job_dir, "job.json")
     save_json(job, {"script": script, "links": links, "kinematics": kinematics or {}, "out": out, "mode": mode,
                     "device": device})
-    cmd = [blender, "-b", "--factory-startup", "--python-exit-code", "1",
-           "-P", os.path.join(HERE, "blender_runner.py"), "--", job]
+    cmd, is_sandboxed = sandboxed([blender, "-b", "--factory-startup", "--python-exit-code", "1",
+                                   "-P", os.path.join(HERE, "blender_runner.py"), "--", job], job_dir, sandbox)
     with open(os.path.join(job_dir, "blender.log"), "w", encoding="utf-8") as logf:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
         if procs is not None and run_id:
@@ -217,6 +229,9 @@ def run_blender(blender, job_dir, script_text, links, mode, device, on_progress=
         with open(os.path.join(job_dir, "blender.log"), encoding="utf-8") as f:
             tail = f.read()[-3000:]
         report = {"ok": False, "error": f"Blender exited with code {proc.returncode} before finishing.\n{tail}"}
+    report["sandboxed"] = is_sandboxed
+    if not is_sandboxed:
+        report.setdefault("warnings", []).append("Blender ran without RenderBuddy's sandbox.")
     return report, out
 
 
@@ -232,7 +247,8 @@ def blender_info(blender):
     out = subprocess.run([blender, "-b", "--factory-startup", "--python-expr", probe], capture_output=True, text=True,
                          timeout=120).stdout
     info = next((json.loads(l[8:]) for l in out.splitlines() if l.startswith("BB_INFO ")), {"blender": "unknown"})
-    info.update({"connector": VERSION, "machine": platform.platform(), "python": platform.python_version()})
+    info.update({"connector": VERSION, "machine": platform.platform(), "python": platform.python_version(),
+                 "sandbox": sandboxed([], JOBS, load_json(CONFIG, {}).get("sandbox", True))[1]})
     return info
 
 
@@ -530,7 +546,8 @@ class Connector:
             script_text = "".join(inputs.get(k) or "" for k in ("script", "script_2", "script_3"))
             mode = inputs.get("mode", "auto")
         report, out = run_blender(self.blender, job_dir, script_text, links, mode, inputs.get("device", "gpu"),
-                                  on_progress, self.procs, run_id, kinematics=kinematics)
+                                  on_progress, self.procs, run_id, kinematics=kinematics,
+                                  sandbox=self.config.get("sandbox", True))
         if run_id in self.cancelled:
             self.safe_report(run_id, "cancelled")
             return
