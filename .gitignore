@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Renders and Blender output
+renders/
+*.blend
+*.blend1
+*.mp4
+
+# macOS
+.DS_Store
+
+# Local settings or keys, if someone points RENDERBUDDY_HOME here
+config.json
+key.pem
+state.json
+status.json
+*.log

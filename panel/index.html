@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RenderBuddy</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header>
+  <span id="dot" class="dot"></span>
+  <h1>RenderBuddy</h1>
+</header>
+<p id="state" class="state">Checking…</p>
+<div id="progress" class="progress" hidden><div id="bar"></div></div>
+<p id="detail" class="detail"></p>
+
+<section id="off-help" hidden>
+  <h2>To turn it on</h2>
+  <ol>
+    <li>On your Mac, press <kbd>⌘</kbd> <kbd>Space</kbd>, type <b>RenderBuddy</b>, press Return.</li>
+    <li>Or click your <b>Start RenderBuddy</b> bookmark (it opens <code>renderbuddy://start</code>).</li>
+  </ol>
+  <p class="detail">STEVE can't start programs on your computer itself, so this one step happens on the Mac.</p>
+</section>
+
+<div class="buttons">
+  <button id="check" type="button" disabled>Check Blender</button>
+</div>
+<p id="message" class="detail"></p>
+<script src="panel.js"></script>
+</body>
+</html>
