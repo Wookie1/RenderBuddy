@@ -64,7 +64,7 @@ on startBB()
 		if justPaired then
 			display notification "Waiting for you to confirm the fingerprint in STEVE." with title "RenderBuddy is on"
 		else
-			display notification "Ready for STEVE. It turns itself off after 30 minutes with no jobs." with title "RenderBuddy is on"
+			display notification "Ready for STEVE. It turns itself off after a while with no jobs." with title "RenderBuddy is on"
 		end if
 	else
 		set choice to button returned of (display dialog "RenderBuddy didn't start. The log says why." buttons {"Show log", "OK"} default button "Show log" with title "RenderBuddy" with icon caution)
@@ -146,7 +146,7 @@ on run
 	repeat
 		try
 			if isRunning() then
-				set choice to button returned of (display dialog "RenderBuddy is on and ready for STEVE." & return & return & "It turns itself off after 30 minutes with no jobs. Turning it off cancels any render in progress." buttons {"More…", "Turn off", "Done"} default button "Done" with title "RenderBuddy")
+				set choice to button returned of (display dialog "RenderBuddy is on and ready for STEVE." & return & return & "It turns itself off after a while with no jobs. Turning it off cancels any render in progress." buttons {"More…", "Turn off", "Done"} default button "Done" with title "RenderBuddy")
 			else
 				set choice to button returned of (display dialog "RenderBuddy is off." buttons {"More…", "Done", "Turn on"} default button "Turn on" with title "RenderBuddy")
 			end if

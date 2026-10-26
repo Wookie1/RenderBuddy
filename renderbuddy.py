@@ -3,7 +3,8 @@
     python3 renderbuddy.py pair <CODE>     enroll with a pairing code from STEVE, print the fingerprint
     python3 renderbuddy.py paired           exit code 0 if this computer is paired with STEVE, 1 if not
     python3 renderbuddy.py run             wait for render jobs and do them; turns itself off after
-                                            30 idle minutes (idle_quit_minutes in config.json, 0 = never)
+                                            8 idle hours (idle_quit_minutes in config.json, 0 = never;
+                                            the app's "Turn off after" menu sets it)
     python3 renderbuddy.py stop            stop a running connector
     python3 renderbuddy.py test <script.py> [alias=design.3mf ...]   render locally, no STEVE involved
     python3 renderbuddy.py info            show the settings, fingerprint and Blender found
@@ -28,7 +29,7 @@ from datetime import datetime, timezone
 
 from steve_connect import SteveClient, SteveError, fingerprint, load_or_create_key, trusted_keys, verify_message
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOME = os.environ.get("RENDERBUDDY_HOME", os.path.expanduser("~/.renderbuddy"))
 CONFIG = os.path.join(HOME, "config.json")
@@ -39,7 +40,7 @@ PIDFILE = os.path.join(HOME, "connector.pid")
 STATUS = os.path.join(HOME, "status.json")  # the latest status, for the RenderBuddy app on this computer
 SANDBOX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sandbox.sb")
 PANEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "panel")
-IDLE_QUIT_MINUTES = 30
+IDLE_QUIT_MINUTES = 8 * 60
 MAX_LINKS = 4
 MAX_UPLOAD = 50 * 1024 * 1024
 
@@ -322,7 +323,10 @@ class Connector:
                 time.sleep(wait)
 
     def idle_limit(self):
-        minutes = self.config.get("idle_quit_minutes", IDLE_QUIT_MINUTES)
+        """Seconds without jobs before turning off (None = never). Read from config.json each time, so a change
+        made in the RenderBuddy app applies straight away."""
+        minutes = load_json(CONFIG, {}).get("idle_quit_minutes", IDLE_QUIT_MINUTES)
+        self.config["idle_quit_minutes"] = minutes
         return float(minutes) * 60 if minutes else None
 
     @staticmethod
@@ -384,7 +388,7 @@ class Connector:
         self.event({"state": "idle"})
         limit = self.idle_limit()
         log("Connected. Waiting for jobs (Ctrl-C to stop)." +
-            (f" Turns itself off after {round(limit / 60)} idle minutes." if limit else ""))
+            (f" Turns itself off after {duration(limit)} without jobs." if limit else ""))
         backoff = 1
         code_stamp = self.code_stamp()
         try:
@@ -394,9 +398,16 @@ class Connector:
 
     def loop(self, limit, backoff, code_stamp):
         while True:
+            new_limit = self.idle_limit()
+            if new_limit != limit:
+                limit = new_limit
+                self.last_active = time.time()  # count the new idle time from now
+                log("Now turns itself off " + (f"after {duration(limit)} without jobs." if limit else "never."))
+                if not self.busy:
+                    self.event({"state": "idle"})
             quiet = self.jobs.empty() and not self.busy
             if quiet and limit and time.time() - self.last_active > limit:
-                self.shut_down(f"no jobs for {round(limit / 60)} minutes")
+                self.shut_down(f"no jobs for {duration(limit)}")
             if self.jobs.empty() and not self.busy and self.code_stamp() != code_stamp:
                 log("The connector's code changed: restarting to load it.")
                 os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -571,6 +582,15 @@ class Connector:
         report.pop("ok", None)
         self.client.report(run_id, "succeeded", result=report, message=summary(report))
         log("Done", run_id, summary(report))
+
+
+def duration(seconds):
+    """30 minutes, 2 hours, 1 hour 30 minutes."""
+    minutes = round(seconds / 60)
+    hours, rest = divmod(minutes, 60)
+    parts = ([f"{hours} hour" + ("s" if hours != 1 else "")] if hours else []) + \
+        ([f"{rest} minute" + ("s" if rest != 1 else "")] if rest or not hours else [])
+    return " ".join(parts)
 
 
 def expired(value):

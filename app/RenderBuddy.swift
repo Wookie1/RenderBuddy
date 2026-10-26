@@ -10,6 +10,20 @@ let programDir = URL(fileURLWithPath: (Bundle.main.object(forInfoDictionaryKey: 
 let logFile = stateDir.appendingPathComponent("connector.log")
 let accent = Color(red: 0.91, green: 0.52, blue: 0.10)  // the sun gear's orange
 
+let defaultIdleMinutes = 8 * 60
+/// The "Turn off after" choices, in minutes (0 = never).
+let idleChoices = [30, 2 * 60, 8 * 60, 0]
+
+/// 30 minutes, 2 hours, 1 hour 30 minutes, Never.
+func duration(minutes: Int) -> String {
+    if minutes <= 0 { return "Never" }
+    let hours = minutes / 60, rest = minutes % 60
+    var parts: [String] = []
+    if hours > 0 { parts.append(hours == 1 ? "1 hour" : "\(hours) hours") }
+    if rest > 0 || hours == 0 { parts.append(rest == 1 ? "1 minute" : "\(rest) minutes") }
+    return parts.joined(separator: " ")
+}
+
 enum Phase: Equatable {
     case notPaired, off, starting, confirming, ready, rendering(Double, String)
 }
@@ -53,7 +67,7 @@ final class Model: ObservableObject {
     @Published var working = false       // a pairing request is under way
     @Published var problem: String?
     @Published var lastStop: String?
-    @Published var idleMinutes = 30
+    @Published var idleMinutes = defaultIdleMinutes
     @Published var askRemove = false
     private var startedAt: Date?
     private var timer: Timer?
@@ -75,7 +89,7 @@ final class Model: ObservableObject {
 
     func refresh() {
         let config = readJSON(stateDir.appendingPathComponent("config.json"))
-        if let minutes = config["idle_quit_minutes"] as? Int { idleMinutes = minutes }
+        idleMinutes = (config["idle_quit_minutes"] as? NSNumber).map { Int($0.doubleValue.rounded()) } ?? defaultIdleMinutes
         if config["connector"] == nil {
             phase = .notPaired
             return
@@ -115,6 +129,22 @@ final class Model: ObservableObject {
         Task {
             let (code, output) = await runProgram("/bin/sh", ["-c", command])
             if code != 0 { problem = "RenderBuddy didn't start: \(output)" }
+        }
+    }
+
+    /// Saves the "Turn off after" choice in config.json; a running RenderBuddy picks it up within a minute.
+    func setIdle(_ minutes: Int) {
+        idleMinutes = minutes
+        let url = stateDir.appendingPathComponent("config.json")
+        var config = readJSON(url)
+        config["idle_quit_minutes"] = minutes
+        guard let data = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
+        else { return }
+        try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            problem = "Couldn't save that setting: \(error.localizedDescription)"
         }
     }
 
@@ -216,7 +246,7 @@ struct ContentView: View {
             Divider()
             footer
         }
-        .frame(width: 400, height: 470)
+        .frame(width: 400, height: 500)
         .confirmationDialog("Remove RenderBuddy from this Mac?", isPresented: $model.askRemove) {
             Button("Remove, Keep My Renders") { model.remove(keepRenders: true) }
             Button("Remove Everything", role: .destructive) { model.remove(keepRenders: false) }
@@ -285,10 +315,29 @@ struct StatusView: View {
             default:
                 EmptyView()
             }
+            HStack {
+                Text("Turn off after")
+                Spacer()
+                Picker("Turn off after", selection: Binding(get: { model.idleMinutes }, set: { model.setIdle($0) })) {
+                    ForEach(choices, id: \.self) { minutes in
+                        Text(minutes == 0 ? "Never" : duration(minutes: minutes)).tag(minutes)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+            }
+            .font(.callout)
+            .help("How long RenderBuddy waits without jobs before turning itself off")
             if let problem = model.problem {
                 Text(problem).font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The menu's choices, plus the current setting if it was set to something else in config.json.
+    var choices: [Int] {
+        idleChoices.contains(model.idleMinutes) ? idleChoices : idleChoices + [model.idleMinutes]
     }
 
     var card: some View {
@@ -358,7 +407,7 @@ struct StatusView: View {
         switch model.phase {
         case .ready:
             return model.idleMinutes > 0
-                ? "STEVE can send render jobs now. RenderBuddy turns itself off after \(model.idleMinutes) minutes without jobs."
+                ? "STEVE can send render jobs now. RenderBuddy turns itself off after \(duration(minutes: model.idleMinutes)) without jobs."
                 : "STEVE can send render jobs now."
         case .rendering(_, let message):
             return message.isEmpty ? "Working on a job from STEVE." : message

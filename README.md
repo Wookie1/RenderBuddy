@@ -12,7 +12,8 @@ the `.blend` file.
   assemblies explode and come back together.
 - **Marketing kits in one go:** logo, product cut-outs, hero image, social post, labelled exploded view, a vertical
   reel and a promo video, all from one request.
-- **Only runs when you want it:** turn it on from the app; it turns itself off after 30 minutes without jobs.
+- **Only runs when you want it:** turn it on from the app; it turns itself off when it's had no jobs for a while
+  (8 hours unless you choose otherwise).
 
 ## What you need
 
@@ -48,11 +49,13 @@ rendering.
 
 ## Everyday use
 
-- **Turn on / off:** open the app and click **Turn On** or **Turn Off**. It also turns itself off after 30 minutes
-  without jobs. Closing the window doesn't stop it.
+- **Turn on / off:** open the app and click **Turn On** or **Turn Off**. It also turns itself off when it's had no jobs
+  for a while. Closing the window doesn't stop it.
 - **From a link:** `renderbuddy://start` turns it on (handy as a browser bookmark next to STEVE),
   `renderbuddy://stop` turns it off.
-- **Change the idle time:** set `"idle_quit_minutes"` in `~/.renderbuddy/config.json` (0 means never).
+- **Choose when it turns itself off:** the app's **Turn off after** menu: 30 minutes, 2 hours, 8 hours (the
+  default) or Never. It takes effect straight away. (It's `"idle_quit_minutes"` in `~/.renderbuddy/config.json`,
+  where 0 means never.)
 - **Log:** the app's **Log** button opens `~/.renderbuddy/connector.log`.
 - **Pair again:** the app's **Pair Again** button.
 - **Blender somewhere else:** put its path in `~/.renderbuddy/config.json` as `{"blender": "/path/to/Blender"}`.
@@ -154,7 +157,8 @@ can run code on your Mac, so RenderBuddy keeps that circle small and the code bo
   folder, temporary folders and Blender's caches, and no reading of SSH keys, keychains, browser data or
   RenderBuddy's own key and settings. Each result says `"sandboxed": true`. If a scene needs something the sandbox
   blocks, `"sandbox": false` in `~/.renderbuddy/config.json` turns it off (not recommended).
-- **It's off most of the time.** It only runs when you turn it on, and turns itself off after 30 idle minutes.
+- **It's off most of the time.** It only runs when you turn it on, and turns itself off after the idle time you choose
+  (8 hours by default).
 - **Your key stays on your Mac** in `~/.renderbuddy/key.pem` (readable only by you). Nothing secret is in this repo.
 
 What the sandbox doesn't stop: a script can still read ordinary files your account can read (outside the blocked

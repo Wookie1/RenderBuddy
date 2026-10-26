@@ -27,7 +27,7 @@ function showStatus(data) {
   if (state === 'idle') {
     $('state').textContent = 'On and ready';
     const minutes = data.idle_quit_minutes;
-    $('detail').textContent = minutes ? `Turns itself off after ${minutes} minutes with no jobs.` : 'Stays on until you turn it off.';
+    $('detail').textContent = minutes ? `Turns itself off after ${duration(minutes)} with no jobs.` : 'Stays on until you turn it off.';
   } else if (state === 'rendering') {
     $('state').textContent = 'Rendering';
     $('bar').style.width = Math.round((data.progress || 0) * 100) + '%';
@@ -37,6 +37,15 @@ function showStatus(data) {
     $('detail').textContent = data && data.why ? `It turned off: ${data.why}.` : '';
   }
   updateButtons();
+}
+
+function duration(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes % 60);
+  const parts = [];
+  if (hours) parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+  if (rest || !hours) parts.push(`${rest} minute${rest === 1 ? '' : 's'}`);
+  return parts.join(' ');
 }
 
 function updateButtons() {
