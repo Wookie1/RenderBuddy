@@ -1,0 +1,24 @@
+{
+  "study": "lightlab-demo",
+  "revision": "demo-proxy",
+  "demo": true,
+  "world": {"color": [0.008, 0.008, 0.011], "strength": 1.0},
+  "materials": [
+    {"match": "led_die", "kind": "emitter", "power": 0.6, "color": [1.0, 0.03, 0.02]},
+    {"match": "brake_light_lens", "kind": "pmma", "ior": 1.49, "roughness": 0.02,
+     "tint": [0.85, 0.08, 0.10], "tint_mm": 3.0},
+    {"match": "halo_ring", "kind": "diffuser", "ior": 1.49, "roughness": 0.2},
+    {"match": "pcb_board", "kind": "opaque", "color": [0.02, 0.10, 0.03], "roughness": 0.5},
+    {"match": "*", "kind": "opaque", "color": [0.08, 0.08, 0.09], "roughness": 0.45}
+  ],
+  "cameras": [
+    {"name": "rear", "at": [0, -170, 35], "look_at": [0, 0, 5], "lens_mm": 50},
+    {"name": "iso", "at": [150, -130, 100], "look_at": [0, 0, 5], "lens_mm": 60}
+  ],
+  "rois": [
+    {"name": "lens", "camera": "rear", "object": "brake_light_lens"},
+    {"name": "halo", "camera": "rear", "object": "halo_ring"},
+    {"name": "center", "camera": "rear", "rect": [0.4, 0.35, 0.6, 0.65]}
+  ],
+  "render": {"samples": 96, "resolution": [960, 540], "seed": 2026, "denoise": true}
+}

@@ -7,6 +7,7 @@
                                             the app's "Turn off after" menu sets it)
     python3 renderbuddy.py stop            stop a running connector
     python3 renderbuddy.py test <script.py> [alias=design.3mf ...]   render locally, no STEVE involved
+    python3 renderbuddy.py study <spec.json> [alias=design.3mf ...]  light-transmission study, no STEVE
     python3 renderbuddy.py info            show the settings, fingerprint and Blender found
 
 Settings and the key live in ~/.renderbuddy (override with RENDERBUDDY_HOME). Jobs go to ~/.renderbuddy/jobs.
@@ -29,7 +30,7 @@ from datetime import datetime, timezone
 
 from steve_connect import SteveClient, SteveError, fingerprint, load_or_create_key, trusted_keys, verify_message
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOME = os.environ.get("RENDERBUDDY_HOME", os.path.expanduser("~/.renderbuddy"))
 CONFIG = os.path.join(HOME, "config.json")
@@ -127,6 +128,35 @@ def kit_script(inputs):
     return "import json\nimport bbkit\n\nbbkit.make_kit(json.loads(%r))\n" % json.dumps(params)
 
 
+def study_props():
+    props = {
+        "study": {"type": "string", "maxLength": 20000, "title": "Study spec",
+                  "description": "JSON study spec: study, revision, materials (pmma/diffuser/emitter/opaque "
+                                 "matched to body names), emitters, cameras, rois, render. See LIGHTLAB.md in "
+                                 "the RenderBuddy folder. Set \"demo\": true to test the pipeline without designs."},
+        "device": {"type": "string", "enum": ["gpu", "cpu"], "default": "gpu", "title": "Device",
+                   "description": "Cycles on the Mac's GPU (Metal) or the CPU."},
+    }
+    for i in range(1, MAX_LINKS + 1):
+        props[f"design_{i}"] = {"x-steve": "file", "format": "3mf", "title": f"Design {i}",
+                                "description": "A STEVE part or design, sent as its bodies placed as modelled."}
+        props[f"alias_{i}"] = {"type": "string", "maxLength": 40, "title": f"Alias {i}",
+                               "description": f"Its name in the study spec (materials match body names); "
+                                             f"default design_{i}."}
+    return props
+
+
+def study_script(inputs):
+    """The Blender script a light_study run executes: Light Lab builds and measures the scene."""
+    try:
+        raw = json.loads(inputs["study"])
+    except ValueError as e:
+        raise RuntimeError(f"study is not valid JSON: {e}")
+    from lightlab import spec as lightlab_spec          # bpy-free: validates before Blender starts
+    lightlab_spec.normalize(raw)
+    return "import json\nimport lightlab\n\nlightlab.run_study(json.loads(%r))\n" % json.dumps(raw)
+
+
 def catalog():
     """Everything this connector offers STEVE."""
     props = {
@@ -172,6 +202,15 @@ def catalog():
                             "and an end card. Give the product design (with its kinematics, for its exploded view) "
                             "and optionally an in-use design with an animation (a phone tapping, a lid opening).",
              "inputs": {"type": "object", "properties": kit_props(), "required": ["design_1"]},
+             "result": {"type": "object"}, "confirm": False},
+            {"name": "light_study", "title": "Light transmission study",
+             "description": "Physically-based light-transmission study of up to 4 STEVE designs in the local "
+                            "Blender: LED emitters, PMMA lens and diffuser materials matched to body names, fixed "
+                            "cameras. Each camera renders as a picture (AgX) and a raw linear OpenEXR; luminance "
+                            "statistics are measured over regions of interest and returned as metrics.json and a "
+                            "study.csv row, so design revisions compare bar-by-bar. Give a study spec (JSON, see "
+                            "LIGHTLAB.md in the RenderBuddy folder); set \"demo\": true to test without designs.",
+             "inputs": {"type": "object", "properties": study_props(), "required": ["study"]},
              "result": {"type": "object"}, "confirm": False},
             {"name": "blender_info", "title": "Blender on this computer",
              "description": "The local Blender version, its GPU devices and the connector's version.",
@@ -553,6 +592,8 @@ class Connector:
         log("Rendering", run_id, "with", list(links) or "no designs")
         if action == "marketing_kit":
             script_text, mode = kit_script(inputs), "outputs"
+        elif action == "light_study":
+            script_text, mode = study_script(inputs), "outputs"
         else:
             script_text = "".join(inputs.get(k) or "" for k in ("script", "script_2", "script_3"))
             mode = inputs.get("mode", "auto")
@@ -564,8 +605,11 @@ class Connector:
             return
         if not report.get("ok"):
             raise RuntimeError(report.get("error", "Blender failed."))
+        if action == "light_study":
+            merge_study_csv(report, out)
         self.client.report(run_id, "running", progress=0.97, message="Uploading results")
-        types = {".png": "image/png", ".mp4": "video/mp4", ".jpg": "image/jpeg", ".json": "application/json"}
+        types = {".png": "image/png", ".mp4": "video/mp4", ".jpg": "image/jpeg", ".json": "application/json",
+                 ".exr": "image/x-exr", ".csv": "text/csv"}
         for kind, name in report.get("outputs", {}).items():
             path = os.path.join(out, name)
             if os.path.getsize(path) > MAX_UPLOAD:
@@ -582,6 +626,26 @@ class Connector:
         report.pop("ok", None)
         self.client.report(run_id, "succeeded", result=report, message=summary(report))
         log("Done", run_id, summary(report))
+
+
+def merge_study_csv(report, out):
+    """Appends a light study's rows to one accumulating CSV per study (~/.renderbuddy/studies/<study>.csv),
+    so revisions compare bar-by-bar across runs. Returns the file's path."""
+    studies_dir = os.path.join(HOME, "studies")
+    os.makedirs(studies_dir, exist_ok=True)
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", str((report.get("lightlab") or {}).get("study", "study"))
+                  ).strip("-") or "study"
+    merged = os.path.join(studies_dir, slug + ".csv")
+    with open(os.path.join(out, "study.csv"), encoding="utf-8") as f:
+        rows = f.read().strip().splitlines()
+    with open(merged, "a", encoding="utf-8") as f:
+        if not os.path.exists(merged) or os.path.getsize(merged) == 0:
+            f.write(rows[0] + "\n")
+        for row in rows[1:]:
+            f.write(row + "\n")
+    if isinstance(report.get("lightlab"), dict):
+        report["lightlab"]["history_csv"] = merged
+    return merged
 
 
 def duration(seconds):
@@ -606,6 +670,11 @@ def expired(value):
 
 def summary(report):
     t = report.get("timings_s", {})
+    if "lightlab" in report:
+        ll = report["lightlab"]
+        revision = f", rev {ll['revision']}" if ll.get("revision") else ""
+        return f"Light study {ll['study']!r}{revision}: {len(ll['cameras'])} cameras, {len(ll['rois'])} ROIs, " \
+               f"{ll['samples']} samples in {round(ll.get('seconds', 0))} s on {report.get('device', '?')}"
     if "kit" in report:
         return f"Marketing kit: {len(report.get('outputs', {}))} files in {round(t.get('total', 0))} s " \
                f"on {report.get('device', '?')}"
@@ -670,8 +739,31 @@ def main():
                                   lambda d, t, s: print(f"  {s} {d}/{t}", flush=True), kinematics=kinematics)
         print(json.dumps(report, indent=2))
         print("Outputs in", out)
+    elif command == "study":
+        if len(args) < 2:
+            sys.exit("Usage: renderbuddy.py study <spec.json> [alias=design.3mf ...] [--device=gpu]")
+        device = next((a.split("=", 1)[1] for a in args if a.startswith("--device=")), "gpu")
+        links = {}
+        for arg in args[2:]:
+            if arg.startswith("--"):
+                continue
+            if "=" not in arg:
+                sys.exit(f"Study designs are alias=file.3mf pairs, got {arg!r}.")
+            alias, path = arg.split("=", 1)
+            links[alias] = os.path.abspath(path)
+        with open(args[1], encoding="utf-8") as f:
+            raw = json.load(f)
+        script_text = study_script({"study": json.dumps(raw)})
+        job_dir = os.path.join(JOBS, time.strftime("study-%Y%m%d-%H%M%S"))
+        os.makedirs(job_dir)
+        report, out = run_blender(find_blender(load_json(CONFIG, {})), job_dir, script_text, links, "outputs",
+                                  device, lambda d, t, s: print(f"  {s} {d}/{t}", flush=True))
+        if report.get("ok") and "lightlab" in report:
+            print("History:", merge_study_csv(report, out))
+        print(json.dumps(report, indent=2))
+        print("Outputs in", out)
     else:
-        sys.exit(f"Unknown command {command!r}. Try: pair, paired, run, stop, test, info")
+        sys.exit(f"Unknown command {command!r}. Try: pair, paired, run, stop, test, study, info")
 
 
 if __name__ == "__main__":
