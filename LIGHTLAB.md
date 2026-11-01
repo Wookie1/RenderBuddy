@@ -118,6 +118,8 @@ If the lens is ever FDM-printed, layer-line scattering dominates reality and thi
       — verified 2026-11-01 on an M4 Max: ~6 s for two cameras at 96 samples; red PMMA absorption visible in
       the channel means (lens ROI r 0.235 / g 0.004 / b 0.006); hotspots and uniformity measured
 - [x] History CSV per study accumulates across runs (`~/.renderbuddy/studies/<study>.csv`)
+- [x] App controls: **Features** toggles in RenderBuddy.app (scene renders / marketing kits / light studies) —
+      writes `features` into config.json; the connector filters its catalog and re-declares it live
 - [ ] First real study on the Bronco assembly (needs the STEVE session's PCB + assembly revisions)
 - [ ] Mitsuba adapter (deferred, see triggers above)
 - [ ] Optional: RenderBuddy panel charting metric history across revisions

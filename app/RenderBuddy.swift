@@ -14,6 +14,13 @@ let defaultIdleMinutes = 8 * 60
 /// The "Turn off after" choices, in minutes (0 = never).
 let idleChoices = [30, 2 * 60, 8 * 60, 0]
 
+/// The features the app can turn on and off ("features" in config.json; a missing key means on).
+let featureList: [(key: String, name: String, detail: String)] = [
+    ("render_scene", "Scene renders", "Render a Blender scene script with up to four designs."),
+    ("marketing_kit", "Marketing kits", "Branded logos, cut-outs, hero images and promo videos in one request."),
+    ("light_study", "Light studies", "Light-transmission studies with luminance metrics, for comparing revisions."),
+]
+
 /// 30 minutes, 2 hours, 1 hour 30 minutes, Never.
 func duration(minutes: Int) -> String {
     if minutes <= 0 { return "Never" }
@@ -68,6 +75,7 @@ final class Model: ObservableObject {
     @Published var problem: String?
     @Published var lastStop: String?
     @Published var idleMinutes = defaultIdleMinutes
+    @Published var features = Dictionary(uniqueKeysWithValues: featureList.map { ($0.key, true) })
     @Published var askRemove = false
     private var startedAt: Date?
     private var timer: Timer?
@@ -90,6 +98,10 @@ final class Model: ObservableObject {
     func refresh() {
         let config = readJSON(stateDir.appendingPathComponent("config.json"))
         idleMinutes = (config["idle_quit_minutes"] as? NSNumber).map { Int($0.doubleValue.rounded()) } ?? defaultIdleMinutes
+        let rawFeatures = config["features"] as? [String: Any]
+        for item in featureList {
+            features[item.key] = (rawFeatures?[item.key] as? Bool) ?? true
+        }
         if config["connector"] == nil {
             phase = .notPaired
             return
@@ -135,9 +147,24 @@ final class Model: ObservableObject {
     /// Saves the "Turn off after" choice in config.json; a running RenderBuddy picks it up within a minute.
     func setIdle(_ minutes: Int) {
         idleMinutes = minutes
-        let url = stateDir.appendingPathComponent("config.json")
-        var config = readJSON(url)
+        var config = readJSON(stateDir.appendingPathComponent("config.json"))
         config["idle_quit_minutes"] = minutes
+        write(config: config)
+    }
+
+    /// Saves one feature's switch in config.json; the running connector re-declares its catalog within a
+    /// few seconds, which hides the action from STEVE until the feature is back on.
+    func setFeature(_ key: String, enabled: Bool) {
+        features[key] = enabled
+        var config = readJSON(stateDir.appendingPathComponent("config.json"))
+        var stored = config["features"] as? [String: Any] ?? [:]
+        stored[key] = enabled
+        config["features"] = stored
+        write(config: config)
+    }
+
+    private func write(config: [String: Any]) {
+        let url = stateDir.appendingPathComponent("config.json")
         guard let data = try? JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
         else { return }
         try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
@@ -246,7 +273,7 @@ struct ContentView: View {
             Divider()
             footer
         }
-        .frame(width: 400, height: 500)
+        .frame(width: 400, height: 580)
         .confirmationDialog("Remove RenderBuddy from this Mac?", isPresented: $model.askRemove) {
             Button("Remove, Keep My Renders") { model.remove(keepRenders: true) }
             Button("Remove Everything", role: .destructive) { model.remove(keepRenders: false) }
@@ -329,6 +356,24 @@ struct StatusView: View {
             }
             .font(.callout)
             .help("How long RenderBuddy waits without jobs before turning itself off")
+            DisclosureGroup {
+                ForEach(featureList, id: \.key) { item in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Toggle(item.name, isOn: Binding(
+                            get: { model.features[item.key] ?? true },
+                            set: { model.setFeature(item.key, enabled: $0) }))
+                            .font(.callout)
+                        Text(item.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 6)
+                }
+            } label: {
+                Text("Features").font(.callout)
+            }
+            .help("Which jobs STEVE may send this Mac. Turning one off hides it from STEVE until it's back on.")
             if let problem = model.problem {
                 Text(problem).font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }

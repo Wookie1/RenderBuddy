@@ -59,6 +59,9 @@ rendering.
 - **Choose when it turns itself off:** the app's **Turn off after** menu: 30 minutes, 2 hours, 8 hours (the
   default) or Never. It takes effect straight away. (It's `"idle_quit_minutes"` in `~/.renderbuddy/config.json`,
   where 0 means never.)
+- **Choose what STEVE may send:** the app's **Features** section toggles scene renders, marketing kits and light
+  studies. A feature turned off disappears from STEVE within seconds (the connector re-declares its catalog) and
+  comes back when re-enabled. It's `"features"` in `~/.renderbuddy/config.json`.
 - **Log:** the app's **Log** button opens `~/.renderbuddy/connector.log`.
 - **Pair again:** the app's **Pair Again** button.
 - **Blender somewhere else:** put its path in `~/.renderbuddy/config.json` as `{"blender": "/path/to/Blender"}`.

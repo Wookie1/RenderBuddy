@@ -51,6 +51,21 @@ BLENDER_CANDIDATES = [
     "/usr/bin/blender", "/usr/local/bin/blender", "/opt/homebrew/bin/blender",
 ]
 
+# The optional features the app can turn on and off ("features" in config.json; absent = all on).
+FEATURES = ("render_scene", "marketing_kit", "light_study")
+
+
+def features(config=None):
+    """Which optional actions the catalog offers. blender_info is always offered."""
+    config = config if config is not None else load_json(CONFIG, {})
+    raw = config.get("features")
+    enabled = {name: True for name in FEATURES}
+    if isinstance(raw, dict):
+        for name in FEATURES:
+            if name in raw:
+                enabled[name] = bool(raw[name])
+    return enabled
+
 
 def log(*args):
     print(datetime.now().strftime("%H:%M:%S"), *args, flush=True)
@@ -187,10 +202,9 @@ def catalog():
         props[f"alias_{i}"] = {"type": "string", "maxLength": 40, "title": f"Alias {i}",
                                "description": f"Its name in the script (`from links import <alias>`); "
                                              f"default design_{i}."}
-    return {
+    catalog = {
         "actions": [
-            {"name": "render_scene", "title": "Render a Blender scene",
-             "description": "Builds a scene from a Blender Python script and up to 4 STEVE designs in the local "
+            {"name": "render_scene", "title": "Render a Blender scene",             "description": "Builds a scene from a Blender Python script and up to 4 STEVE designs in the local "
                             "Blender, renders it on this computer, and returns still.png, animation.mp4 "
                             "(animated scenes) and scene.blend, with timings in the result.",
              "inputs": {"type": "object", "properties": props, "required": ["script"]},
@@ -218,6 +232,11 @@ def catalog():
         ],
         "events": [{"name": "status", "description": "idle, rendering (with the current job's progress) or off"}],
     }
+    # Features off: the action isn't offered at all (blender_info always is). The connector re-declares
+    # the catalog when the app changes these, and refuses runs for actions it no longer offers.
+    enabled = features()
+    catalog["actions"] = [a for a in catalog["actions"] if a["name"] not in FEATURES or enabled.get(a["name"], True)]
+    return catalog
 
 
 # Running Blender -------------------------------------------------------------------------------------------------------
@@ -421,6 +440,7 @@ class Connector:
             self.keys = trusted_keys(self.client.keys())
         log(f"RenderBuddy {VERSION}, {self.client.fingerprint}, Blender at {self.blender}")
         self.wait_for_confirmation()
+        self.declared = features()
         self.client.put_catalog(catalog())
         self.publish_panel()
         threading.Thread(target=self.worker, daemon=True).start()
@@ -452,6 +472,11 @@ class Connector:
                 os.execv(sys.executable, [sys.executable] + sys.argv)
             try:
                 self.client.refresh_token()
+                now = features()
+                if now != self.declared:
+                    log("Features changed:", ", ".join(name for name, on in now.items() if on) or "none")
+                    self.declared = now
+                    self.client.put_catalog(catalog())
                 answer = self.client.messages(self.state.get("cursor"))
                 for message in answer.get("messages", []):
                     self.handle(message)
