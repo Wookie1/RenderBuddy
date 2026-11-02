@@ -186,3 +186,10 @@ Found a security problem? Please open an issue without the details and ask for a
 
 MIT, see [LICENSE](LICENSE). RenderBuddy is an independent project. It isn't made or endorsed by the Blender
 Foundation or by STEVE. Blender is a trademark of the Blender Foundation.
+
+Everything in this repository — the connector, the app and the Light Lab (`lightlab/`) — is MIT. The programs
+and libraries it drives but does not include keep their own licenses, all permissive: **Blender** (GPL 2 or
+later) runs as a separate program you install, driven only through its command line and public Python API, so
+its license doesn't extend to RenderBuddy's code; **numpy** (BSD-3) is the copy bundled with Blender;
+**cryptography** (Apache-2.0 or BSD-3) is a normal pip dependency. A future Mitsuba adapter would likewise
+use **Mitsuba 3** (BSD-3) as a package you install yourself, never bundled here.
