@@ -52,8 +52,11 @@ rendering.
 
 ## Everyday use
 
-- **Turn on / off:** open the app and click **Turn On** or **Turn Off**. It also turns itself off when it's had no jobs
-  for a while. Closing the window doesn't stop it.
+- **Menu bar:** a switch icon in the macOS menu bar shows the status at a glance and turns RenderBuddy on or off,
+  flips the feature switches and reopens the window.
+- **Turn on / off:** open the app and click **Turn On** or **Turn Off** (or use the menu bar icon). It also turns
+  itself off when it's had no jobs for a while. Closing the window doesn't stop it — the app stays in the menu
+  bar; quit it from the menu (or Cmd-Q) when you're done. The renders keep going either way.
 - **From a link:** `renderbuddy://start` turns it on (handy as a browser bookmark next to STEVE),
   `renderbuddy://stop` turns it off.
 - **Choose when it turns itself off:** the app's **Turn off after** menu: 30 minutes, 2 hours, 8 hours (the

@@ -521,7 +521,62 @@ struct PairView: View {
 // MARK: - App
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    // The app stays alive in the menu bar when the window closes; Quit is in the menu (and Cmd-Q).
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            NSApp.activate(ignoringOtherApps: true)
+            for window in sender.windows where window.title == "RenderBuddy" {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        return true
+    }
+}
+
+// MARK: - Menu bar
+
+extension Phase {
+    var menuText: String {
+        switch self {
+        case .notPaired: return "Not paired with STEVE"
+        case .off: return "Off"
+        case .starting: return "Starting…"
+        case .confirming: return "Waiting for STEVE"
+        case .ready: return "On and ready"
+        case .rendering(let progress, _): return "Rendering · \(Int(progress * 100))%"
+        }
+    }
+}
+
+struct MenuContent: View {
+    @EnvironmentObject var model: Model
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Text(model.phase.menuText)
+        Divider()
+        switch model.phase {
+        case .notPaired:
+            Button("Pair with STEVE…") { model.pairing = true; openWindow(id: "main") }
+        case .off:
+            Button("Turn On") { model.turnOn() }
+        case .starting, .confirming:
+            EmptyView()
+        case .ready, .rendering:
+            Button("Turn Off") { model.turnOff() }
+        }
+        Divider()
+        ForEach(featureList, id: \.key) { item in
+            Toggle(item.name, isOn: Binding(
+                get: { model.features[item.key] ?? true },
+                set: { model.setFeature(item.key, enabled: $0) }))
+        }
+        Divider()
+        Button("Open RenderBuddy") { openWindow(id: "main") }
+        Button("Quit RenderBuddy") { NSApp.terminate(nil) }
+    }
 }
 
 @main
@@ -537,5 +592,11 @@ struct RenderBuddyApp: App {
         }
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)
+
+        MenuBarExtra("RenderBuddy", systemImage: "switch.2") {
+            MenuContent()
+                .environmentObject(model)
+        }
+        .menuBarExtraStyle(.menu)
     }
 }
