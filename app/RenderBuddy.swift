@@ -356,22 +356,26 @@ struct StatusView: View {
             }
             .font(.callout)
             .help("How long RenderBuddy waits without jobs before turning itself off")
-            DisclosureGroup {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Features").font(.callout)
                 ForEach(featureList, id: \.key) { item in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Toggle(item.name, isOn: Binding(
+                    HStack(alignment: .top, spacing: 8) {
+                        Toggle("", isOn: Binding(
                             get: { model.features[item.key] ?? true },
                             set: { model.setFeature(item.key, enabled: $0) }))
-                            .font(.callout)
-                        Text(item.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                            .fixedSize()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name).font(.callout)
+                            Text(item.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    .padding(.top, 6)
+                    .padding(.leading, 12)
                 }
-            } label: {
-                Text("Features").font(.callout)
             }
             .help("Which jobs STEVE may send this Mac. Turning one off hides it from STEVE until it's back on.")
             if let problem = model.problem {
