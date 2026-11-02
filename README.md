@@ -52,8 +52,8 @@ rendering.
 
 ## Everyday use
 
-- **Menu bar:** a switch icon in the macOS menu bar shows the status at a glance and turns RenderBuddy on or off,
-  flips the feature switches and reopens the window.
+- **Menu bar:** a planetary-gear icon in the macOS menu bar shows the status at a glance and turns RenderBuddy
+  on or off, flips the feature switches and reopens the window.
 - **Turn on / off:** open the app and click **Turn On** or **Turn Off** (or use the menu bar icon). It also turns
   itself off when it's had no jobs for a while. Closing the window doesn't stop it — the app stays in the menu
   bar; quit it from the menu (or Cmd-Q) when you're done. The renders keep going either way.

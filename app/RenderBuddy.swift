@@ -537,6 +537,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 // MARK: - Menu bar
 
+/// The menu bar icon: a straight-on planetary gearset — ring, three planets, sun with a shaft hole —
+/// drawn with pure CoreGraphics as a monochrome template image, so macOS adapts it to light and dark
+/// menu bars and it stays crisp on Retina.
+private func makePlanetaryIcon() -> NSImage {
+    let px = 36
+    let size = NSSize(width: 18, height: 18)
+    let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    guard let cg = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: px * 4,
+                             space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+        return NSImage(systemSymbolName: "gearshape", accessibilityDescription: "RenderBuddy")!
+    }
+    let centre = CGPoint(x: CGFloat(px) / 2, y: CGFloat(px) / 2)
+    cg.setFillColor(CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 1))
+
+    func circle(_ radius: CGFloat, _ c: CGPoint = centre) -> CGPath {
+        CGPath(ellipseIn: CGRect(x: c.x - radius, y: c.y - radius, width: radius * 2, height: radius * 2),
+               transform: nil)
+    }
+
+    let ring = CGMutablePath()                       // the ring gear: a bold annulus
+    ring.addPath(circle(16.8))
+    ring.addPath(circle(12.3))
+    cg.addPath(ring)
+    cg.fillPath(using: .evenOdd)
+
+    for angle in [CGFloat(90), 210, 330].map({ $0 * .pi / 180 }) {   // three planets
+        cg.addPath(circle(3.6, CGPoint(x: centre.x + 8.5 * cos(angle), y: centre.y + 8.5 * sin(angle))))
+        cg.fillPath()
+    }
+
+    let sun = CGMutablePath()                        // the sun gear with its shaft hole
+    sun.addPath(circle(3.6))
+    sun.addPath(circle(1.5))
+    cg.addPath(sun)
+    cg.fillPath(using: .evenOdd)
+
+    guard let glyph = cg.makeImage() else {
+        return NSImage(systemSymbolName: "gearshape", accessibilityDescription: "RenderBuddy")!
+    }
+    let image = NSImage(cgImage: glyph, size: size)
+    image.isTemplate = true
+    image.accessibilityDescription = "RenderBuddy"
+    return image
+}
+
+private let menuBarIcon = makePlanetaryIcon()
+
 extension Phase {
     var menuText: String {
         switch self {
@@ -593,9 +640,11 @@ struct RenderBuddyApp: App {
         .windowResizability(.contentSize)
         .windowStyle(.hiddenTitleBar)
 
-        MenuBarExtra("RenderBuddy", systemImage: "switch.2") {
+        MenuBarExtra {
             MenuContent()
                 .environmentObject(model)
+        } label: {
+            Image(nsImage: menuBarIcon)
         }
         .menuBarExtraStyle(.menu)
     }
