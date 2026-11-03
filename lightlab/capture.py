@@ -146,10 +146,23 @@ def _contact_sheet(paths, out_path):
 
 
 def render_views(spec, cameras, out_dir, on_progress=None):
-    """Renders every camera, measures, writes metrics.json + study.csv + rois.json + contact.png.
-    Returns (camera_stats, rois_resolved, timings, warnings)."""
+    """Applies the spec's render settings to the scene, renders every camera, measures, writes
+    metrics.json + study.csv + rois.json + contact.png. Returns (camera_stats, rois_resolved, timings,
+    warnings, rois_name, contact_name, actual), with actual = the settings the scene really used."""
     scene = bpy.context.scene
+    apply_render_settings(spec)
+    # Read the settings back out of the scene: the report must say what ran, not what was asked.
+    actual = {"samples": scene.cycles.samples, "seed": scene.cycles.seed,
+              "denoise": scene.cycles.use_denoising,
+              "resolution": [int(scene.render.resolution_x * scene.render.resolution_percentage / 100),
+                             int(scene.render.resolution_y * scene.render.resolution_percentage / 100)]}
+    wanted = [int(spec["render"]["resolution"][0] * spec["render"]["scale"] / 100),
+              int(spec["render"]["resolution"][1] * spec["render"]["scale"] / 100)]
     warnings = []
+    if actual["samples"] != spec["render"]["samples"] or actual["resolution"] != wanted:
+        warnings.append(f"Render settings mismatch: wanted {spec['render']['samples']} samples at "
+                        f"{wanted[0]}x{wanted[1]}, the scene used {actual['samples']} at "
+                        f"{actual['resolution'][0]}x{actual['resolution'][1]}")
     timings = {}
     camera_stats, rois_resolved = {}, {}
     png_paths = []
@@ -187,4 +200,4 @@ def render_views(spec, cameras, out_dir, on_progress=None):
         json.dump(rois_resolved, f, indent=2)
     contact_name = "contact.png"
     _contact_sheet(png_paths, os.path.join(out_dir, contact_name))
-    return camera_stats, rois_resolved, timings, warnings, rois_name, contact_name
+    return camera_stats, rois_resolved, timings, warnings, rois_name, contact_name, actual

@@ -53,13 +53,13 @@ def run_study(raw_spec):
     def progress(done, total, stage):
         bbstate.progress(done, total, stage)
 
-    camera_stats, rois_resolved, timings, capture_warnings, rois_name, contact_name = capture.render_views(
-        spec, built["cameras"], bbstate.OUT, progress)
+    camera_stats, rois_resolved, timings, capture_warnings, rois_name, contact_name, actual = \
+        capture.render_views(spec, built["cameras"], bbstate.OUT, progress)
     warnings += capture_warnings
 
     from datetime import datetime, timezone
     meta = {"study": spec["study"], "revision": spec["revision"], "spec_hash": spec["spec_hash"],
-            "samples": spec["render"]["samples"], "seed": spec["render"]["seed"],
+            "samples": actual["samples"], "seed": actual["seed"],
             "device": bbstate.DEVICE, "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     metrics_name, csv_name = metrics.write_results(bbstate.OUT, camera_stats, rois_resolved, meta)
 
@@ -74,7 +74,8 @@ def run_study(raw_spec):
         "study": spec["study"], "revision": spec["revision"], "spec_hash": spec["spec_hash"],
         "demo": spec["demo"], "cameras": sorted(camera_stats),
         "rois": sorted({roi for per_camera in camera_stats.values() for roi in per_camera}),
-        "samples": spec["render"]["samples"], "seed": spec["render"]["seed"],
+        "samples": actual["samples"], "seed": actual["seed"],
+        "resolution": actual["resolution"], "denoise": actual["denoise"],
         "seconds": total, "render_seconds": timings,
     }
     bbstate.WARNINGS.extend(warnings)
