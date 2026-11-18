@@ -12,9 +12,11 @@ the `.blend` file.
   assemblies explode and come back together.
 - **Marketing kits in one go:** logo, product cut-outs, hero image, social post, labelled exploded view, a vertical
   reel and a promo video, all from one request.
-- **Light-transmission studies:** LED emitters, PMMA lenses and diffusers, fixed cameras; each view renders as a
-  picture and a raw linear EXR, and luminance statistics over regions of interest land in one accumulating CSV, so
-  design revisions compare bar-by-bar (see [LIGHTLAB.md](LIGHTLAB.md)).
+**Light-transmission studies:** LED emitters, PMMA lenses and diffusers, fixed cameras; each view renders as a
+picture and a raw linear EXR, and luminance statistics over regions of interest land in one accumulating CSV, so
+design revisions compare bar-by-bar. Environments for beauty renders: a physical sun+sky (dusk is a parameter)
+or bundled HDRI room maps, plus a finish library for machined, anodized, molded and lens surfaces. Photorealism
+assets (HDRIs) are from [Poly Haven](https://polyhaven.com), CC0. See [LIGHTLAB.md](LIGHTLAB.md).
 - **Only runs when you want it:** turn it on from the app; it turns itself off when it's had no jobs for a while
   (8 hours unless you choose otherwise).
 

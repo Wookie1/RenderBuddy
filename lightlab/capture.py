@@ -154,6 +154,7 @@ def render_views(spec, cameras, out_dir, on_progress=None):
     # Read the settings back out of the scene: the report must say what ran, not what was asked.
     actual = {"samples": scene.cycles.samples, "seed": scene.cycles.seed,
               "denoise": scene.cycles.use_denoising,
+              "clamp_indirect": scene.cycles.sample_clamp_indirect,
               "resolution": [int(scene.render.resolution_x * scene.render.resolution_percentage / 100),
                              int(scene.render.resolution_y * scene.render.resolution_percentage / 100)]}
     wanted = [int(spec["render"]["resolution"][0] * spec["render"]["scale"] / 100),

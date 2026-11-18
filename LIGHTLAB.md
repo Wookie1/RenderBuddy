@@ -43,7 +43,7 @@ Outputs uploaded: <camera>.png, <camera>.exr, rois.json, metrics.json, study.csv
 
 **Renderer-agnostic contract (the Mitsuba plug-in point):** everything goes through the study spec
 (`lightlab/spec.py`). A future `mitsuba_adapter` reads the same spec, converts meshes 3MF→PLY once, renders
-EXRs, and feeds arrays into `metrics.stats_from_array`. `metrics.py` and `spec.py` never import bpy.
+EXRs, and feeds arrays into `metrics.stats_from_array`. `metrics.py`, `spec.py` and `finishes.py` never import bpy.
 
 ## The study spec (JSON)
 
@@ -52,12 +52,15 @@ EXRs, and feeds arrays into `metrics.stats_from_array`. `metrics.py` and `spec.p
   "study": "bronco-tail-light",          // required
   "revision": "lens-pass2",              // optional label, lands in the CSV
   "demo": false,                         // true: build proxy geometry, ignore designs
-  "world": {"color": [0.01, 0.01, 0.012], "strength": 1.0},
+  "world": {"kind": "sunsky", "sun_elevation": 4, "sun_rotation": 210, "sun_disc": false,
+            "model": "single", "air": 1, "ozone": 1, "strength": 1.0},   // or flat / envmap, below
   "materials": [                         // first match wins on body/instance name (case-insensitive regex)
     {"match": "led",  "kind": "emitter", "power": 0.5, "color": [1.0, 0.03, 0.02]},   // W total, 1 unit = 1 mm
     {"match": "lens", "kind": "pmma", "ior": 1.49, "roughness": 0.02,
      "tint": [0.92, 0.10, 0.12], "tint_mm": 3.0},                                      // or "absorption": [..] per mm
     {"match": "halo", "kind": "diffuser", "ior": 1.49, "roughness": 0.15},
+    {"match": "billet", "kind": "finish", "finish": "machined-aluminum"},              // textured library, lightlab/finishes.py
+    {"match": "housing", "kind": "finish", "finish": "anodized", "color": [0.08, 0.08, 0.09]},
     {"match": "*",    "kind": "opaque", "color": [0.75, 0.76, 0.78], "roughness": 0.4, "metallic": 0.0}
   ],
   "emitters": [                          // optional explicit dies when the PCB has no die bodies
@@ -79,8 +82,20 @@ EXRs, and feeds arrays into `metrics.stats_from_array`. `metrics.py` and `spec.p
 
 Material kinds: `opaque` (color/roughness/metallic), `pmma` (transmission 1, IOR, roughness, Beer–Lambert
 absorption from `tint` at `tint_mm` or direct `absorption` per mm), `diffuser` (frosted transmission),
-`emitter` (matched bodies glow; `power` in W distributed over matched surface area, Lambertian). Optional
+`emitter` (matched bodies glow; `power` in W distributed over matched surface area, Lambertian), and
+`finish` (a named, textured recipe from `lightlab/finishes.py` — machined-anisotropic metal, anodized,
+molded plastic, lens with dust, PCB solder mask; `color`/`roughness` overridable per entry). Optional
 `kelvin` instead of `color` on emitters. `alias` field on any entry restricts it to one linked design.
+
+**Worlds.** `"kind": "flat"` (default) is a plain color — what metric studies want, so the measurement
+isolates the product's own light. `"kind": "sunsky"` is Blender's physical sky (sun elevation/rotation in
+degrees, `model` single|multiple, sun disc off by default: it is tiny and violently bright) for dusk and
+daylight beauty renders. `"kind": "envmap"` lights the scene with an HDRI: a file path on this computer or
+a name bundled in `lightlab/hdris/` (`lilienstein` sunset, `autoshop_01` warm garage, `brown_photostudio_02`
+warm studio — Poly Haven, CC0; see `lightlab/hdris/CREDITS.md`), with `rotation` and `strength`. Beauty
+renders show the product in an environment; with an environment world, the metrics and renders measure the
+product's light *plus* the environment's (a warning in the report says so), so revision comparisons should
+stick to the flat warm-defaults or change the environment identically between revisions.
 
 ## Physics conventions (documented, consistent across runs)
 
@@ -88,7 +103,11 @@ absorption from `tint` at `tint_mm` or direct `absorption` per mm), `diffuser` (
   = P / (A·π), with A converted mm²→m². EXR values are relative within this convention — comparisons only.
 - Volume absorption: per-channel σₐ (1/mm) used directly as Cycles volume density (per BU = per mm).
 - Comparability: fixed `seed`, adaptive sampling **off**, indirect clamp **off** (caustics survive), generous
-  transmission bounces (24), same denoiser for PNG and EXR.
+  transmission bounces (24), same denoiser for PNG and EXR. The metrics.json metadata records the settings
+  read back from the scene (samples, seed, denoise, indirect clamp) so drift shows up there. **History
+  caveat:** study.csv rows from before 2026-11-02 were measured with Blender's default indirect clamp of 10,
+  which caps light-pipe and lens paths at a tenth of their real radiance — do not mix those rows with
+  post-fix rows in one comparison; re-run the baseline instead.
 
 ## Metrics (per camera × ROI, on linear luminance Y = 0.2126R + 0.7152G + 0.0722B)
 
@@ -120,6 +139,9 @@ If the lens is ever FDM-printed, layer-line scattering dominates reality and thi
 - [x] History CSV per study accumulates across runs (`~/.renderbuddy/studies/<study>.csv`)
 - [x] App controls: **Features** toggles in RenderBuddy.app (scene renders / marketing kits / light studies) —
       writes `features` into config.json; the connector filters its catalog and re-declares it live
+- [x] Environment worlds (`flat` / `sunsky` physical sky / `envmap` HDRI) and the finish library — verified
+      2026-11-17 with the dusk (`examples/lightlab_beauty.json`) and garage (`examples/lightlab_room.json`)
+      demo studies; three Poly Haven 1k HDRIs bundled (CC0, `lightlab/hdris/CREDITS.md`)
 - [ ] First real study on the Bronco assembly (needs the STEVE session's PCB + assembly revisions)
 - [ ] Mitsuba adapter (deferred, see triggers above)
 - [ ] Optional: RenderBuddy panel charting metric history across revisions

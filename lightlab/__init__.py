@@ -59,7 +59,7 @@ def run_study(raw_spec):
 
     from datetime import datetime, timezone
     meta = {"study": spec["study"], "revision": spec["revision"], "spec_hash": spec["spec_hash"],
-            "samples": actual["samples"], "seed": actual["seed"],
+            "samples": actual["samples"], "seed": actual["seed"], "clamp_indirect": actual["clamp_indirect"],
             "device": bbstate.DEVICE, "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     metrics_name, csv_name = metrics.write_results(bbstate.OUT, camera_stats, rois_resolved, meta)
 
@@ -76,6 +76,7 @@ def run_study(raw_spec):
         "rois": sorted({roi for per_camera in camera_stats.values() for roi in per_camera}),
         "samples": actual["samples"], "seed": actual["seed"],
         "resolution": actual["resolution"], "denoise": actual["denoise"],
+        "clamp_indirect": actual["clamp_indirect"],
         "seconds": total, "render_seconds": timings,
     }
     bbstate.WARNINGS.extend(warnings)

@@ -5,7 +5,10 @@ import hashlib
 import json
 import re
 
-KINDS = ("opaque", "pmma", "glass", "diffuser", "emitter")
+from .finishes import FINISHES
+
+KINDS = ("opaque", "pmma", "glass", "diffuser", "emitter", "finish")
+WORLD_KINDS = ("flat", "sunsky", "envmap")
 QUALITY = {"preview": {"samples": 32, "scale": 50},
            "draft": {"samples": 128, "scale": 75},
            "final": {"samples": 256, "scale": 100}}
@@ -79,6 +82,20 @@ def _material(entry, index):
             out["kelvin"] = _number(entry["kelvin"], f"{name}.kelvin", 1000, 20000)
         else:
             out["color"] = _vec(entry.get("color", [1.0, 1.0, 1.0]), 3, f"{name}.color", 0, 1)
+    elif kind == "finish":
+        preset = _str(entry.get("finish"), f"{name}.finish")
+        if preset not in FINISHES:
+            raise SpecError(f"{name}.finish {preset!r} is not in the Light Lab finish library: "
+                            f"{sorted(FINISHES)}")
+        out["finish"] = preset
+        out["params"] = dict(FINISHES[preset])
+        if entry.get("color") is not None:
+            out["params"]["color"] = _vec(entry["color"], 3, f"{name}.color", 0, 1)
+        if entry.get("roughness") is not None:
+            out["params"]["roughness"] = _number(entry["roughness"], f"{name}.roughness", 0, 1)
+        if entry.get("tint") is not None:                      # clear-plastic tints (pmma finish)
+            out["tint"] = _vec(entry["tint"], 3, f"{name}.tint", 0, 1)
+            out["tint_mm"] = _number(entry.get("tint_mm", 3.0), f"{name}.tint_mm", 0.01)
     return out
 
 
@@ -107,6 +124,35 @@ def _emitter(entry, index):
     return out
 
 
+def _world(raw):
+    """The world block: today's flat dark color, a physical Nishita sun + sky, or an HDRI environment."""
+    if not isinstance(raw, dict):
+        raise SpecError("world must be an object")
+    out = {"kind": _str(raw.get("kind", "flat"), "world.kind", WORLD_KINDS)}
+    if out["kind"] == "flat":
+        out["color"] = _vec(raw.get("color", [0.01, 0.01, 0.012]), 3, "world.color", 0, 1)
+        out["strength"] = _number(raw.get("strength", 1.0), "world.strength", 0)
+    elif out["kind"] == "sunsky":
+        out["sun_elevation"] = _number(raw.get("sun_elevation", 8.0),
+                                       "world.sun_elevation (degrees above horizon)", -10, 90)
+        out["sun_rotation"] = _number(raw.get("sun_rotation", 210.0), "world.sun_rotation (degrees, 0..360)", 0, 360)
+        out["sun_disc"] = bool(raw.get("sun_disc", False))     # the disc is tiny and very bright: fireflies
+        out["sun_intensity"] = _number(raw.get("sun_intensity", 1.0), "world.sun_intensity", 0, 20)
+        out["model"] = _str(raw.get("model", "single"), "world.model", ("single", "multiple"))
+        out["air"] = _number(raw.get("air", 1.0), "world.air", 0, 10)
+        out["ozone"] = _number(raw.get("ozone", 1.0), "world.ozone", 0, 5)
+        out["strength"] = _number(raw.get("strength", 1.0), "world.strength", 0)
+    else:                                                      # envmap
+        file = raw.get("file")
+        if not isinstance(file, str) or not file.strip():
+            raise SpecError("world.kind \"envmap\" needs \"file\": an HDRI path on this computer, or a "
+                            "name bundled in lightlab/hdris (e.g. \"autoshop_01\", \"lilienstein\")")
+        out["file"] = file.strip()
+        out["rotation"] = _number(raw.get("rotation", 0.0), "world.rotation (degrees, 0..360)", 0, 360)
+        out["strength"] = _number(raw.get("strength", 1.0), "world.strength", 0)
+    return out
+
+
 def normalize(raw):
     """Validates a raw study spec and fills in every default. Raises SpecError with a plain message."""
     if not isinstance(raw, dict):
@@ -115,8 +161,7 @@ def normalize(raw):
         "study": _str(raw.get("study"), "study"),
         "revision": str(raw["revision"]) if raw.get("revision") is not None else "",
         "demo": bool(raw.get("demo", False)),
-        "world": {"color": _vec(raw.get("world", {}).get("color", [0.01, 0.01, 0.012]), 3, "world.color", 0, 1),
-                  "strength": _number(raw.get("world", {}).get("strength", 1.0), "world.strength", 0)},
+        "world": _world(raw.get("world") or {}),
         "materials": [_material(e, i) for i, e in enumerate(raw.get("materials", []))],
         "emitters": [_emitter(e, i) for i, e in enumerate(raw.get("emitters", []))],
     }

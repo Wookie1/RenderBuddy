@@ -1,0 +1,18 @@
+{
+  "study": "lightlab-room",
+  "revision": "garage-preview",
+  "demo": true,
+  "world": {"kind": "envmap", "file": "autoshop_01", "rotation": 140, "strength": 1.0},
+  "materials": [
+    {"match": "led_die", "kind": "emitter", "power": 0.6, "color": [1.0, 0.03, 0.02]},
+    {"match": "brake_light_lens", "kind": "finish", "finish": "pmma",
+     "tint": [0.85, 0.08, 0.10], "tint_mm": 3.0},
+    {"match": "halo_ring", "kind": "diffuser", "ior": 1.49, "roughness": 0.2},
+    {"match": "pcb_board", "kind": "finish", "finish": "pcb-solder-mask"},
+    {"match": "*", "kind": "finish", "finish": "anodized", "color": [0.08, 0.08, 0.09]}
+  ],
+  "cameras": [
+    {"name": "iso", "at": [120, -110, 80], "look_at": [0, 0, 5], "lens_mm": 60}
+  ],
+  "render": {"samples": 128, "resolution": [1280, 720], "seed": 2026, "denoise": true}
+}
